@@ -15,7 +15,6 @@ import { paymentFailed } from 'src/common/utils/payment.utils';
 import { InsufficientBalance } from 'src/common/exceptions/incufficientBalance.exception';
 import { PaymentNotFound } from 'src/common/exceptions/paymentNotFound.exception';
 import { MaxAttemptException } from 'src/common/exceptions/maxAttempt.exception';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class PaymentService {
