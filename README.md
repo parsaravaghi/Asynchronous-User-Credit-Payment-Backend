@@ -1,128 +1,77 @@
-# Asynchronous User Credit Payment Backend
+# API Documentation
 
-## Overview
+A simple REST API for managing users, payments, balances, and admin reports. The project uses NestJS, PostgreSQL, Redis, RabbitMQ, Prisma, and Docker.
 
-Design and implement a backend service to manage user credit balances and allow users to submit payment requests, which are processed asynchronously.
+## API Routes
 
-## Functional Requirements
+### Users
 
-### 1. User Credit Balance Management
+| Method | Route                | Description      |
+| ------ | -------------------- | ---------------- |
+| POST   | `/users`             | Create user      |
+| GET    | `/users/:id/balance` | Get user balance |
+| POST   | `/users/:id/credit`  | Add credit       |
 
-* Per-user balance must be maintained (table: users or accounts).
-* Provide a way to seed/default balances or an API to credit/recharge user accounts.
+### Payments
 
-### 2. Payment Request Submission
+| Method | Route                | Description    |
+| ------ | -------------------- | -------------- |
+| POST   | `/payment`           | Create payment |
+| POST   | `/payment/:id/retry` | Retry payment  |
 
-* Provide an API to submit a payment request with:
+### Admin
 
-  * `userId`
-  * `amount`
-  * `reference` (e.g., invoice number)
-  * `description`
+| Method | Route                          | Description            |
+| ------ | ------------------------------ | ---------------------- |
+| GET    | `/admin/users`                 | List users             |
+| GET    | `/admin/users/:id`             | Get user details       |
+| GET    | `/admin/reports/aggregate`     | Get transaction report |
+| GET    | `/admin/reports/usage/:userId` | Get user balance usage |
 
-* On submission:
+### Examples
 
-  * Store a payment request record with initial status (`PENDING` or `QUEUED`).
-  * Place the request into a processing queue for background (async) processing.
+```text
+GET /admin/users?page=1&limit=20&sort=createdAt&order=desc
 
-### 3. Asynchronous Payment Processing Worker
+GET /admin/reports/aggregate?period=month
+```
 
-* Background worker picks requests from the queue.
-* Processing logic includes:
+`period`: `day` | `month` | `year`
 
-  * Check if the user’s balance is sufficient.
-  * If sufficient: deduct atomically and mark as `SUCCEEDED`.
-  * If not: mark as `FAILED` with reason.
-* Simulate failures via:
+## Docker
 
-  * Higher amount → higher chance of failure.
-  * Specific reference patterns → always fail (for testing).
-* Concurrency safety: Prevent race conditions/double deduction.
+Start the project:
 
-### 4. Payment Status Management
+```bash
+docker compose up --build
+```
 
-Track and update payment request status:
+Run in background:
 
-* `PENDING`
-* `QUEUED`
-* `PROCESSING`
-* `SUCCEEDED`
-* `FAILED`
-* Optional: `CANCELLED`
+```bash
+docker compose up -d
+```
 
-### 5. Transaction Records
+Stop:
 
-For each successful payment (debit):
+```bash
+docker compose down
+```
 
-* Record amount, user, payment request ID, timestamp, reference, and transaction type (`DEBIT`).
-* Table: `transactions`.
+View logs:
 
-### 6. Event History
+```bash
+docker compose logs -f
+```
 
-Log significant state changes/events per payment:
+Check containers:
 
-* Created
-* Queued
-* Processing Started
-* Succeeded
-* Failed
-* Retry Triggered
+```bash
+docker compose ps
+```
 
-Table: `payment_events`.
+Run Prisma migration:
 
-### 7. Retry Mechanism
-
-* Allow retry for system/technical failures only (not business logic like insufficient funds).
-* Record retry attempts in event history.
-* Ensure idempotency and atomicity: no double deduction even if requests are retried.
-* Define retry policy (max attempts, backoff, etc.).
-
-### 8. Minimal Admin Panel
-
-Reports features:
-
-* Aggregate credits/debits per period (daily, monthly, yearly).
-* List of users and their balances.
-* User account details and transactions.
-* Report on balance usage per user.
-
-## Technical Notes
-
-### Stack
-
-* NestJS
-* Redis
-* PostgreSQL
-* Prisma
-* RabbitMQ
-
-### Database Design
-
-PostgreSQL, suggested tables:
-
-* `users`: User info and aggregate balance.
-* `payment_requests`: Payment request records (amount, status, reference, user, etc.).
-* `transactions`: Records of actual debits (plus optional credits).
-* `payment_events`: History of events/state changes for each payment.
-
-### Processing and Concurrency
-
-* Use an async job queue (e.g. RabbitMQ).
-* Ensure atomic balance deduction (use SQL `UPDATE ... WHERE` with pre-check or DB transaction).
-* Implement unique request key / idempotency key for payment requests.
-
-### Retry Policy
-
-* Only allow retries for errors classified as technical (e.g., transient DB error, queue failure).
-* Business errors (like insufficient balance) do not allow retry unless balance changes.
-
-### Simulation of Failures
-
-For testing:
-
-* Set failure probability based on amount.
-* Special treatment for references containing e.g. `"FAIL"` to force error.
-
-## Estimated Timeline
-
-* 4–5 days maximum for the MVP implementation.
+```bash
+docker compose exec app npx prisma migrate deploy
+```
