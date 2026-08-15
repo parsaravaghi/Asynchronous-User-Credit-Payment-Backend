@@ -15,6 +15,7 @@ import { paymentFailed } from 'src/common/utils/payment.utils';
 import { InsufficientBalance } from 'src/common/exceptions/incufficientBalance.exception';
 import { PaymentNotFound } from 'src/common/exceptions/paymentNotFound.exception';
 import { MaxAttemptException } from 'src/common/exceptions/maxAttempt.exception';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class PaymentService {
@@ -120,7 +121,7 @@ export class PaymentService {
 
       return payment;
     } catch (error) {
-      this.handleRetryError(error);
+      this.handlePrismaError(error);
     }
   }
 
@@ -250,25 +251,17 @@ export class PaymentService {
     throw new InternalServerErrorException();
   }
 
-  private handleRetryError(error: unknown): never {
+  private handlePrismaError(error: unknown): never {
     if (error instanceof HttpException) {
       throw error;
     }
-    // P2025 means the update condition matched no record.
-    // In this case the payment either does not exist or is no longer FAILED.
-    if (
-      error instanceof PrismaClientKnownRequestError &&
-      error.code === 'P2025'
-    ) {
-      throw new PaymentNotFound();
-    }
 
-    throw new InternalServerErrorException();
-  }
-
-  private handlePrismaError(error: unknown): never {
     if (error instanceof PrismaClientKnownRequestError) {
+      // P2025 means the update condition matched no record.
+      // In this case the payment either does not exist or is no longer FAILED.
       switch (error.code) {
+        case 'P2025':
+          throw new PaymentNotFound();
         // The payment references a user that does not exist.
         case 'P2003':
           throw new NotFoundException('User not found');

@@ -1,26 +1,111 @@
 services:
-  postgress:
+  postgres:
     image: postgres:18-alpine
     volumes:
-     - type: tmpfs
-       target: /dev/shm
-       tmpfs:
-         size: 134217728 # 128*2^20 bytes = 128Mb
+      - type: tmpfs
+        target: /dev/shm
+        tmpfs:
+          size: 134217728
+
     ports:
-      - 5432:5432
+      - "5432:5432"
+
     env_file:
       - .env
 
-  reabbitmq: 
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  rabbitmq:
     image: rabbitmq:4-management-alpine
+
     volumes:
       - rabbitmqData:/var/lib/rabbitmq
+
     ports:
-      - 5672:5672
-      - 15672:15672
+      - "5672:5672"
+      - "15672:15672"
+
     env_file:
       - .env
 
+    healthcheck:
+      test:
+        ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:8-alpine
+
+    container_name: redis
+
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis_data:/data
+
+    command: redis-server --appendonly yes
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli -a $${REDIS_PASSWORD:-} --no-auth-warning ping | grep -q PONG",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: dockerfile
+
+    command: npx prisma migrate deploy
+
+    env_file:
+      - .env
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: dockerfile
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - .env
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+      rabbitmq:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
 volumes:
-  rabbitmqData: 
-    driver: local
+  rabbitmqData:
+  redis_data:

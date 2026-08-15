@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client/extension';
 import { FailureReason } from 'generated/prisma';
 import { PrismaService } from 'src/database/prisma.service';
 
