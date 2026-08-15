@@ -3,6 +3,31 @@ enum TransactionType {
   CREDIT
 }
 
+enum EventType {
+  CREATED
+  QUEUED
+  PROCESSING_STARTED
+  SUCCEEDED
+  FAILED
+  RETRY_TRIGGERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum FailureReason {
+  INSUFFICIENT_BALANCE
+  FORCED_TEST_FAILURE
+  TECHNICAL_ERROR
+}
+
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -13,24 +38,56 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  username     String        @unique
-  email        String        @unique
-  balance      Decimal       @default(0) @db.Decimal(18, 2)
-  asOf         DateTime      @default(now())
-  createdAt    DateTime      @default(now())
-  updateAt     DateTime      @updatedAt
-  transactions Transaction[]
+  id              String           @id @default(uuid())
+  username        String           @unique
+  email           String           @unique
+  balance         Decimal          @default(0) @db.Decimal(18, 2)
+  asOf            DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updateAt        DateTime         @updatedAt
+  transactions    Transaction[]
+  paymentRequests PaymentRequest[]
 }
 
 model Transaction {
-  id           String          @id @default(uuid())
-  userId       String
-  user         User            @relation(fields: [userId], references: [id])
-  amount       Decimal         @db.Decimal(18, 2)
-  type         TransactionType
-  balanceAfter Decimal         @db.Decimal(18, 2)
-  createdAt    DateTime        @default(now())
+  id               String          @id @default(uuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id])
+  paymentRequestId String?
+  paymentRequest   PaymentRequest? @relation(fields: [paymentRequestId], references: [id])
+  amount           Decimal         @db.Decimal(18, 2)
+  type             TransactionType
+  balanceAfter     Decimal         @db.Decimal(18, 2)
+  createdAt        DateTime        @default(now())
 
   @@index([userId, createdAt])
+}
+
+model PaymentRequest {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id])
+  amount         Decimal        @db.Decimal(18, 2)
+  failureReason  FailureReason?
+  status         PaymentStatus
+  attemptCount   Int            @default(0)
+  maxAttempt     Int            @default(4)
+  idempotencyKey String         @unique
+  reference      String
+  description    String
+  createdAt      DateTime       @default(now())
+  paymentEvents  PaymentEvent[]
+  transactions   Transaction[]
+
+  @@index([userId, status])
+}
+
+model PaymentEvent {
+  id               String         @id @default(uuid())
+  paymentRequestId String
+  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id])
+  eventType        EventType
+  createdAt        DateTime       @default(now())
+
+  @@index([paymentRequestId, createdAt])
 }

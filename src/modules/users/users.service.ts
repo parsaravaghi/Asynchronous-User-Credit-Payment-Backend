@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/client';
 
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService } from 'src/database/prisma.service';
 
 import { UserStoreDto } from './dto/userStor.dto';
 import { UserCreditDto } from './dto/userCredit.dto';
-import { UserDuplicateException } from './exceptions/userDuplicate.exception';
+import { UserDuplicateException } from '../../common/exceptions/userDuplicate.exception';
 
 @Injectable()
 export class UsersService {
